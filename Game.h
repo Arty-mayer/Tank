@@ -1,8 +1,10 @@
 
 #include <Arduino.h>
-#include "Button.h"
+#include "MP_Game.h"
+#include "Lib_Button.h"
+#include "Menu.h"
 #include "Tank.h"
-#include "Ai.h"
+#include "tank_Ai.h"
 #include "Gfx.h"
 #include "cannonShell.h"
 #include "explosion.h"
@@ -16,21 +18,25 @@
 #define MAX_TANK_COUNT 10
 #define CANNON2_MAX 20
 #define CANNON1_MAX 5
+#define MAX_EXPLOSIONS 10
 
-extern Button btn_lt; 
-extern Button btn_rt; 
-extern Button btn_dn; 
-extern Button btn_up; 
-extern Button btn_st; 
+extern Button btn_lt;
+extern Button btn_rt;
+extern Button btn_dn;
+extern Button btn_up;
+extern Button btn_st;
+extern Button btn_esc;
+extern Button btn_md;
 
 namespace Tank
 {
 
-    class Game
+    class GameTank : public Game
     {
 
     public:
-        Game(); // constructor
+        GameTank(); // constructor
+        ~GameTank();
 
         void mainLoop();
         Tank *tank[MAX_TANK_COUNT];
@@ -39,11 +45,14 @@ namespace Tank
         byte shell2TankNum[CANNON2_MAX];
         cannonShell *shell2[CANNON2_MAX];
         cannonShell *shell1[CANNON1_MAX];
-        Explosion *expl[10];
+        Explosion *expl[MAX_EXPLOSIONS];
         byte explosionsCount = 0;
-        byte enemysCount = 0;
+        byte enemysCount = 1;
+        byte lives = 1;
+        bool getExit();
 
     private:
+        bool exit = false;
         bool movmentBlockControl(byte tankNum);
         byte hittingEnemys(byte i);
         bool hittingPlayer(byte i);
@@ -58,12 +67,34 @@ namespace Tank
         void tankControl();
         void explosionsControl();
         void cannonControl();
-        byte findFreeShell(byte max);
+        byte findFreeShell();
+        byte findFreeEnemysShell();
         byte findFreeExpl();
         void gameStep();
-        void btnsListener();
+     //   void btnsListener();
+
+        void menuCreate();
+        void menuOptionActivation();
+        bool menuOptionChange(bool revers);
+        void gameInitialil();
+        void menuHandler();
+        void gameStart();
+        void gamePause();
+        void gameResume();
+        void gameEnd();
+        void gameExit();
+
+
+        //variables
+        bool menudraw;
+        bool gameStarted;
+        byte gameScreen;
+        
+
+
         Timer frameTimer = Timer(35);
-        // Adafruit_SSD1306 &dspl;
+        Menu* menu;
+      
         Gfx gfx = Gfx();
     };
 }

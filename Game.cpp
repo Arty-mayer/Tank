@@ -1,467 +1,733 @@
+
 #include "Game.h"
 
-namespace Tank{
-
-
-Game::Game()
+namespace Tank
 {
-    ai[0] = nullptr;
-    for (byte i = 1; i < MAX_TANK_COUNT; i++)
-    {
-        tank[i] = nullptr;
-        ai[i] = nullptr;
-    }
-    for (byte i = 1; i <= 3; i++)
-    {
-        tank[i] = new Tank(50, (i - 1) * 20, LEFT, 2, 2);
-        ai[i] = new Ai(*tank[i]);
-    }
-    tank[0] = new Tank(0, 20, RIGHT, 1, 5);
 
-    shell1[0] = nullptr;
-    shell1[1] = nullptr;
-    for (byte i = 0; i < 10; i++)
+    GameTank::GameTank()
     {
-        expl[i] = nullptr;
+        gameInitialil();
+        gameStarted = false;
+        gameScreen = 0;
+        gfx.drawScr();
+        delay(300);
     }
-}
 
-void Game::mainLoop()
-{
-    btnsListener();
-    tank[0]->shootTimer.tick();
-
-    frameTimer.tick();
-    if (frameTimer.isTimerEnd())
+    GameTank::~GameTank()
     {
-        frameTimer.timerStart();
-        gameStep();
-    }
-}
-
-void Game::drawScreen()
-{
-    for (byte i = 0; i < 10; i++)
-    {
-        if (tank[i] == nullptr)
+        gameEnd();
+        if (menu != nullptr)
         {
-            continue;
+            delete menu;
+            menu = nullptr;
         }
-        gfx.drawTank(tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getMovement(), tank[i]->getChainAnimation(), tank[i]->getSize(), tank[i]->getBildSet());
+        delay(300);
     }
-    for (byte i = 0; i < CANNON1_MAX; i++)
+
+    void GameTank::gameInitialil()
     {
-        if (shell1[i] != nullptr)
+        menu = nullptr;
+        for (byte i = 0; i < MAX_TANK_COUNT; i++)
         {
-            gfx.drawCannon(shell1[i]->getX(), shell1[i]->getY());
+
+            tank[i] = nullptr;
+            ai[i] = nullptr;
         }
-    }
-    for (byte i = 0; i < CANNON2_MAX; i++)
-    {
-        if (shell2[i] != nullptr)
+
+        for (byte i = 0; i < CANNON1_MAX; i++)
         {
-            gfx.drawCannon(shell2[i]->getX(), shell2[i]->getY());
+            shell1[i] = nullptr;
+        }
+
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            shell2[i] = nullptr;
+        }
+
+        for (byte i = 0; i < MAX_EXPLOSIONS; i++)
+        {
+            expl[i] = nullptr;
         }
     }
 
-    for (byte i = 0; i < 10; i++)
+    void GameTank::menuHandler()
     {
-        if (expl[i] != nullptr)
+        menudraw = false;
+        if (menu == nullptr)
         {
-            gfx.drawExplosion(expl[i]->getX(), expl[i]->getY(), expl[i]->getImgNum());
-        }
-    }
-    gfx.drawScr();
-}
-
-byte Game::findFreeShell(byte max)
-{
-    for (byte i = 0; i < max; i++)
-    {
-        if (shell1[i] == nullptr)
-        {
-            return i;
-        }
-    }
-    return 254;
-}
-
-void Game::tankControl()
-{
-    if (btn_st.btnState())
-    {
-        if (tank[0]->shoot())
-        {
-            byte a = findFreeShell(CANNON1_MAX);
-            if (a != 254)
+            menuCreate();
+            if (gameStarted)
             {
-                shell1[a] = new cannonShell(tank[0]->getCannonStartX(), tank[0]->getCannonStartY(), tank[0]->getMovement());
+
+                gfx.drawPauseMenu(menu->getCheckedOption());
+                gfx.drawScr();
+            }
+            else
+            {
+                gfx.drawMenu(menu->getCheckedOption(), lives, enemysCount);
+                gfx.drawScr();
+            }
+        }
+        menu->menuTimersTick();
+
+        if (btn_rt.btnState() || btn_lt.btnState())
+        {
+            menudraw = menu->optionChanging(btn_lt.btnState());
+        }
+        if (btn_up.btnState() || btn_dn.btnState())
+        {
+            menudraw = menuOptionChange(btn_dn.btnState());
+        }
+        if (btn_st.btnState())
+        {
+            menuOptionActivation();
+        }
+        if (menudraw)
+        {
+            if (gameStarted)
+            {
+
+                gfx.drawPauseMenu(menu->getCheckedOption());
+                gfx.drawScr();
+            }
+            else
+            {
+                gfx.drawMenu(menu->getCheckedOption(), lives, enemysCount);
+                gfx.drawScr();
             }
         }
     }
 
-    if (btn_lt.btnState() || btn_rt.btnState())
+    bool GameTank::menuOptionChange(bool revers)
     {
-        bool rev = btn_lt.btnState();
-        tank[0]->moveH(rev, movmentBlockControl(0));
-        Ai::setEmenyPos(tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize());
-    }
-
-    if (btn_up.btnState() || btn_dn.btnState())
-    {
-        bool rev = btn_up.btnState();
-        tank[0]->moveV(rev, movmentBlockControl(0));
-    }
-    tank[0]->setposLock(false);
-
-    enemysControl();
-}
-
-void Game::enemysControl()
-{
-    for (byte i = 1; i < 10; i++)
-    {
-        if (tank[i] != nullptr && ai[i] != nullptr)
+        if (gameStarted)
         {
-            bool blocker = movmentBlockControl(i);
-            switch (ai[i]->getMove(blocker))
+            return false;
+        }
+        if (menu->getCheckedOption() == 2)
+        {
+            if (menu->getTimerIsEnd())
             {
-            case UP:
-                tank[i]->moveV(true, blocker);
-                break;
-            case DOWN:
-                tank[i]->moveV(false, blocker);
-                break;
-            case LEFT:
-                tank[i]->moveH(true, blocker);
-                break;
-            case RIGHT:
-                tank[i]->moveH(false, blocker);
-                break;
-            }
-            tank[i]->shootTimer.tick();
-            tank[i]->setposLock(false);
-            if (ai[i]->getShoot() == 1)
-            {
-
-                if (tank[i]->shoot())
+                menu->timerRestart();
+                lives = (revers) ? lives - 1 : lives + 1;
+                if (lives < 1)
                 {
-                    byte a = findFreeShell(20);
-                    if (a != 254)
+                    lives = 1;
+                }
+                if (lives > 5)
+                {
+                    lives = 5;
+                }
+                return true;
+            }
+        }
+        if (menu->getCheckedOption() == 3)
+        {
+            if (menu->getTimerIsEnd())
+            {
+                menu->timerRestart();
+                enemysCount = (revers) ? enemysCount - 1 : enemysCount + 1;
+                if (enemysCount < 1)
+                {
+                    enemysCount = 1;
+                }
+                if (enemysCount > 5)
+                {
+                    enemysCount = 5;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void GameTank::menuCreate()
+    {
+        if (menu != nullptr)
+        {
+            return;
+        }
+        menu = new Menu;
+        if (gameStarted)
+        {
+            menu->addOption(2);
+        }
+        else
+        {
+            menu->addOption(4);
+        }
+    }
+
+    void GameTank::menuOptionActivation()
+    {
+        if (gameStarted)
+        {
+            switch (menu->getCheckedOption())
+            {
+            case 1:
+                gameResume();
+                break;
+            case 2:
+                gameEnd();
+                break;
+            }
+        }
+        else
+        {
+            switch (menu->getCheckedOption())
+            {
+            case 1:
+                gameStart();
+                break;
+            case 4:
+                gameExit();
+                break;
+            }
+        }
+    }
+
+    void GameTank::gameStart()
+    {
+        if (menu != nullptr)
+        {
+            delete menu;
+            menu = nullptr;
+        }
+        tank[0] = new Tank(0, 20, RIGHT, 1, 2);
+        for (byte i = 1; i <= enemysCount; i++)
+        {
+            tank[i] = new Tank(50, (i - 1) * 20, LEFT, 2, 2);
+            ai[i] = new Ai(tank[i]);
+        }
+        delay(500);
+        gameScreen = 1;
+        gameStarted = true;
+        frameTimer.timerStart();
+    }
+
+    void GameTank::gamePause()
+    {
+        frameTimer.timerStop();
+        gameScreen = 0;
+        delay(300);
+    }
+
+    void GameTank::gameResume()
+    {
+        if (menu != nullptr)
+        {
+            delete menu;
+            menu = nullptr;
+        }
+        delay(500);
+        frameTimer.timerStart();
+        gameScreen = 1;
+    }
+
+    void GameTank::gameEnd()
+    {
+        if (menu != nullptr)
+        {
+            delete menu;
+            menu = nullptr;
+        }
+        frameTimer.timerStop();
+        gameStarted = false;
+        gameScreen = 0;
+
+        for (byte i = 0; i < MAX_TANK_COUNT; i++)
+        {
+            if (tank[i] != nullptr)
+            {
+                delete tank[i];
+                tank[i] = nullptr;
+            }
+            if (ai[i] != nullptr)
+            {
+                delete ai[i];
+                ai[i] = nullptr;
+            }
+        }
+
+        for (byte i = 0; i < CANNON1_MAX; i++)
+        {
+            if (shell1[i] != nullptr)
+            {
+                delete shell1[i];
+                shell1[i] = nullptr;
+            }
+        }
+
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] != nullptr)
+            {
+                delete shell2[i];
+                shell2[i] = nullptr;
+            }
+        }
+
+        for (byte i = 0; i < MAX_EXPLOSIONS; i++)
+        {
+            if (expl[i] != nullptr)
+            {
+                delete expl[i];
+                expl[i] = nullptr;
+            }
+        }
+
+        delay(300);
+    }
+
+    void GameTank::gameExit()
+    {
+        exit = true;
+        gameEnd();
+    }
+
+    void GameTank::mainLoop()
+    {
+        if (exit)
+        {
+            return;
+        }
+        if (gameScreen == 0)
+        {
+            menuHandler();
+            return;
+        }
+
+        frameTimer.tick();
+        if (frameTimer.isTimerEnd())
+        {
+            frameTimer.timerStart();
+            gameStep();
+        }
+    }
+
+    void GameTank::drawScreen()
+    {
+        for (byte i = 0; i < 10; i++)
+        {
+            if (tank[i] == nullptr)
+            {
+                continue;
+            }
+            gfx.drawTank(tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getMovement(), tank[i]->getChainAnimation(), tank[i]->getSize(), tank[i]->getBildSet());
+        }
+        for (byte i = 0; i < CANNON1_MAX; i++)
+        {
+            if (shell1[i] != nullptr)
+            {
+                gfx.drawCannon(shell1[i]->getX(), shell1[i]->getY());
+            }
+        }
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] != nullptr)
+            {
+                gfx.drawCannon(shell2[i]->getX(), shell2[i]->getY());
+            }
+        }
+
+        for (byte i = 0; i < MAX_EXPLOSIONS; i++)
+        {
+            if (expl[i] != nullptr)
+            {
+                gfx.drawExplosion(expl[i]->getX(), expl[i]->getY(), expl[i]->getImgNum());
+            }
+        }
+        gfx.drawBorder();
+        gfx.drawScr();
+    }
+
+    byte GameTank::findFreeShell()
+    {
+        for (byte i = 0; i < CANNON1_MAX; i++)
+        {
+            if (shell1[i] == nullptr)
+            {
+                return i;
+            }
+        }
+        return 254;
+    }
+    byte GameTank::findFreeEnemysShell()
+    {
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] == nullptr)
+            {
+                return i;
+            }
+        }
+        return 254;
+    }
+
+    void GameTank::tankControl()
+    {
+        if (btn_st.btnState())
+        {
+            if (tank[0]->shoot())
+            {
+                byte a = findFreeShell();
+                if (a != 254)
+                {
+                    shell1[a] = new cannonShell(tank[0]->getCannonStartX(), tank[0]->getCannonStartY(), tank[0]->getMovement());
+                }
+            }
+        }
+
+        if (btn_lt.btnState() || btn_rt.btnState())
+        {
+            bool rev = btn_lt.btnState();
+            tank[0]->moveH(rev, movmentBlockControl(0));
+            Ai::setEmenyPos(tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize());
+        }
+
+        if (btn_up.btnState() || btn_dn.btnState())
+        {
+            bool rev = btn_up.btnState();
+            tank[0]->moveV(rev, movmentBlockControl(0));
+        }
+        tank[0]->setposLock(false);
+
+        enemysControl();
+    }
+
+    void GameTank::enemysControl()
+    {
+        for (byte i = 1; i < 10; i++)
+        {
+            if (tank[i] != nullptr && ai[i] != nullptr)
+            {
+                bool blocker = movmentBlockControl(i);
+                switch (ai[i]->getMove(blocker))
+                {
+                case UP:
+                    tank[i]->moveV(true, blocker);
+                    break;
+                case DOWN:
+                    tank[i]->moveV(false, blocker);
+                    break;
+                case LEFT:
+                    tank[i]->moveH(true, blocker);
+                    break;
+                case RIGHT:
+                    tank[i]->moveH(false, blocker);
+                    break;
+                }
+                tank[i]->shootTimer.tick();
+                tank[i]->setposLock(false);
+                if (ai[i]->getShoot() == 1)
+                {
+                    if (tank[i]->shoot())
                     {
-                        shell2TankNum[a] = i;
-                        shell2[a] = new cannonShell(tank[i]->getCannonStartX(), tank[i]->getCannonStartY(), tank[i]->getMovement());
+                        byte a = findFreeEnemysShell();
+                        if (a != 254)
+                        {
+                            shell2TankNum[a] = i;
+                            shell2[a] = new cannonShell(tank[i]->getCannonStartX(), tank[i]->getCannonStartY(), tank[i]->getMovement());
+                        }
                     }
                 }
             }
         }
     }
-}
 
-bool Game::movmentBlockControl(byte TankNum)
-{
-    for (byte i = 0; i < MAX_TANK_COUNT; i++)
+    bool GameTank::getExit()
     {
-        if (i == TankNum || tank[i] == nullptr)
-        {
-            continue;
-        }
-
-        switch (tank[TankNum]->getMovement())
-        {
-        case UP:
-            if (checkCollisionU(tank[TankNum]->getTankXPosition(), tank[TankNum]->getTankYPosition() - tank[TankNum]->getSpeed(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
-            {
-                return true;
-            }
-            break;
-        case DOWN:
-            if (checkCollisionD(tank[TankNum]->getTankXPosition(), tank[TankNum]->getTankYPosition() + tank[TankNum]->getSpeed(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
-            {
-                return true;
-            }
-            break;
-        case LEFT:
-            if (checkCollisionL(tank[TankNum]->getTankXPosition() - tank[TankNum]->getSpeed(), tank[TankNum]->getTankYPosition(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
-            {
-                return true;
-            }
-            break;
-        case RIGHT:
-            if (checkCollisionR(tank[TankNum]->getTankXPosition() + tank[TankNum]->getSpeed(), tank[TankNum]->getTankYPosition(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
-            {
-                return true;
-            }
-            break;
-        }
+        return exit;
     }
-    return false;
-}
 
-byte Game::hittingEnemys(byte i)
-{
-    for (byte b = 1; b < 10; b++)
+    bool GameTank::movmentBlockControl(byte TankNum)
     {
-        if (tank[b] != nullptr)
+        for (byte i = 0; i < MAX_TANK_COUNT; i++)
         {
+            if (i == TankNum || tank[i] == nullptr)
+            {
+                continue;
+            }
 
-            switch (shell1[i]->getDirection())
+            switch (tank[TankNum]->getMovement())
             {
             case UP:
-                if (checkCollisionU(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                if (checkCollisionU(tank[TankNum]->getTankXPosition(), tank[TankNum]->getTankYPosition() - tank[TankNum]->getSpeed(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
                 {
-                    return b;
+                    return true;
                 }
                 break;
             case DOWN:
-                if (checkCollisionD(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                if (checkCollisionD(tank[TankNum]->getTankXPosition(), tank[TankNum]->getTankYPosition() + tank[TankNum]->getSpeed(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
                 {
-                    return b;
+                    return true;
                 }
                 break;
             case LEFT:
-                if (checkCollisionL(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                if (checkCollisionL(tank[TankNum]->getTankXPosition() - tank[TankNum]->getSpeed(), tank[TankNum]->getTankYPosition(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
                 {
-                    return b;
+                    return true;
                 }
                 break;
             case RIGHT:
-                if (checkCollisionR(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                if (checkCollisionR(tank[TankNum]->getTankXPosition() + tank[TankNum]->getSpeed(), tank[TankNum]->getTankYPosition(), tank[TankNum]->getSize(), tank[i]->getTankXPosition(), tank[i]->getTankYPosition(), tank[i]->getSize()))
                 {
-                    return b;
+                    return true;
                 }
                 break;
             }
         }
+        return false;
     }
-    return 0;
-}
 
-bool Game::hittingPlayer(byte i)
-{
-    if (tank[0] != nullptr)
+    byte GameTank::hittingEnemys(byte i)
     {
-
-        switch (shell2[i]->getDirection())
+        for (byte b = 1; b < 10; b++)
         {
-        case UP:
-            if (checkCollisionU(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
+            if (tank[b] != nullptr)
             {
-                return true;
-            }
-            break;
-        case DOWN:
-            if (checkCollisionD(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
-            {
-                return true;
-            }
-            break;
-        case LEFT:
-            if (checkCollisionL(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
-            {
-                return true;
-            }
-            break;
-        case RIGHT:
-            if (checkCollisionR(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
-            {
-                return true;
-            }
-            break;
-        }
-    }
 
-    return false;
-}
-
-bool Game::checkCollisionU(int x1, int y1, byte size1, int x2, int y2, byte size2)
-{
-    if (y1 <= y2 + size2 && y1 >= y2)
-    {
-        if (x1 + size1 > x2 && x1 < x2 + size2)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-bool Game::checkCollisionD(int x1, int y1, byte size1, int x2, int y2, byte size2)
-{
-    if (y1 + size1 >= y2 && y1 + size1 <= y2 + size2)
-    {
-        if (x1 + size1 > x2 && x1 < x2 + size2)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-bool Game::checkCollisionL(int x1, int y1, byte size1, int x2, int y2, byte size2)
-{
-    if (x1 <= x2 + size2 && x1 >= x2)
-    {
-        if (y1 + size1 > y2 && y1 < y2 + size2)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-bool Game::checkCollisionR(int x1, int y1, byte size1, int x2, int y2, byte size2)
-{
-    if (x1 + size1 >= x2 && x1 + size1 <= x2 + size2)
-    {
-        if (y1 + size1 > y2 && y1 < y2 + size2)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-void Game::explosionsControl()
-{
-
-    for (byte i = 0; i < 10; i++)
-    {
-        if (expl[i] != nullptr && expl[i]->isFinished())
-        {
-            delete expl[i];
-            expl[i] = nullptr;
-            explosionsCount--;
-        }
-    }
-}
-
-void Game::cannonControl()
-{
-
-    for (byte i = 0; i < CANNON1_MAX; i++)
-    {
-        if (shell1[i] != nullptr)
-        {
-            shell1[i]->flyStep();
-
-            byte a = hittingEnemys(i);
-
-            if (a != 0)
-            {
-                shell1[i]->explosed = true;
-            }
-        }
-    }
-
-    for (byte i = 0; i < CANNON2_MAX; i++)
-    {
-        if (shell2[i] != nullptr)
-        {
-            shell2[i]->flyStep();
-            if (hittingPlayer(i))
-            {
-                shell2[i]->explosed = true;
-            }
-        }
-    }
-
-    for (byte i = 0; i < CANNON1_MAX; i++)
-    {
-        if (shell1[i] != nullptr)
-        {
-            if (shell1[i]->getExplosed())
-            {
-                if (explosionsCount < 10)
+                switch (shell1[i]->getDirection())
                 {
-                    explosionsCount++;
-                    expl[findFreeExpl()] = new Explosion(shell1[i]->getX(), shell1[i]->getY(), true);
+                case UP:
+                    if (checkCollisionU(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                    {
+                        return b;
+                    }
+                    break;
+                case DOWN:
+                    if (checkCollisionD(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                    {
+                        return b;
+                    }
+                    break;
+                case LEFT:
+                    if (checkCollisionL(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                    {
+                        return b;
+                    }
+                    break;
+                case RIGHT:
+                    if (checkCollisionR(shell1[i]->getX(), shell1[i]->getY(), shell1[i]->getSize(), tank[b]->getTankXPosition(), tank[b]->getTankYPosition(), tank[b]->getSize()))
+                    {
+                        return b;
+                    }
+                    break;
                 }
-                delete shell1[i];
-                shell1[i] = nullptr;
-                tank[0]->cannon1Count--;
             }
         }
+        return 0;
     }
 
-    for (byte i = 0; i < CANNON2_MAX; i++)
+    bool GameTank::hittingPlayer(byte i)
     {
-        if (shell2[i] != nullptr)
+        if (tank[0] != nullptr)
         {
-            if (shell2[i]->getExplosed())
+
+            switch (shell2[i]->getDirection())
             {
-                if (explosionsCount < 10)
+            case UP:
+                if (checkCollisionU(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
                 {
-                    explosionsCount++;
-                    expl[findFreeExpl()] = new Explosion(shell2[i]->getX(), shell2[i]->getY(), true);
+                    return true;
                 }
-                delete shell2[i];
-                shell2[i] = nullptr;
-                tank[shell2TankNum[i]]->cannon1Count--;
+                break;
+            case DOWN:
+                if (checkCollisionD(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
+                {
+                    return true;
+                }
+                break;
+            case LEFT:
+                if (checkCollisionL(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
+                {
+                    return true;
+                }
+                break;
+            case RIGHT:
+                if (checkCollisionR(shell2[i]->getX(), shell2[i]->getY(), shell2[i]->getSize(), tank[0]->getTankXPosition(), tank[0]->getTankYPosition(), tank[0]->getSize()))
+                {
+                    return true;
+                }
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    bool GameTank::checkCollisionU(int x1, int y1, byte size1, int x2, int y2, byte size2)
+    {
+        if (y1 <= y2 + size2 && y1 >= y2)
+        {
+            if (x1 + size1 > x2 && x1 < x2 + size2)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool GameTank::checkCollisionD(int x1, int y1, byte size1, int x2, int y2, byte size2)
+    {
+        if (y1 + size1 >= y2 && y1 + size1 <= y2 + size2)
+        {
+            if (x1 + size1 > x2 && x1 < x2 + size2)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool GameTank::checkCollisionL(int x1, int y1, byte size1, int x2, int y2, byte size2)
+    {
+        if (x1 <= x2 + size2 && x1 >= x2)
+        {
+            if (y1 + size1 > y2 && y1 < y2 + size2)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool GameTank::checkCollisionR(int x1, int y1, byte size1, int x2, int y2, byte size2)
+    {
+        if (x1 + size1 >= x2 && x1 + size1 <= x2 + size2)
+        {
+            if (y1 + size1 > y2 && y1 < y2 + size2)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void GameTank::explosionsControl()
+    {
+
+        for (byte i = 0; i < MAX_EXPLOSIONS; i++)
+        {
+            if (expl[i] != nullptr && expl[i]->isFinished())
+            {
+                delete expl[i];
+                expl[i] = nullptr;
+                explosionsCount--;
             }
         }
     }
 
-    for (byte i = 0; i < CANNON1_MAX; i++)
+    void GameTank::cannonControl()
     {
-        if (shell1[i] != nullptr)
+
+        for (byte i = 0; i < CANNON1_MAX; i++)
         {
-            shell1[i]->setPosLock(false);
+            if (shell1[i] != nullptr)
+            {
+                shell1[i]->flyStep();
+
+                byte a = hittingEnemys(i);
+
+                if (a != 0)
+                {
+                    shell1[i]->explosed = true;
+                }
+            }
+        }
+
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] != nullptr)
+            {
+                shell2[i]->flyStep();
+                if (hittingPlayer(i))
+                {
+                    shell2[i]->explosed = true;
+                }
+            }
+        }
+
+        for (byte i = 0; i < CANNON1_MAX; i++)
+        {
+            if (shell1[i] != nullptr)
+            {
+                if (shell1[i]->getExplosed())
+                {
+                    if (explosionsCount < 10)
+                    {
+                        explosionsCount++;
+                        expl[findFreeExpl()] = new Explosion(shell1[i]->getX(), shell1[i]->getY(), true);
+                    }
+                    delete shell1[i];
+                    shell1[i] = nullptr;
+                    tank[0]->cannon1Count--;
+                }
+            }
+        }
+
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] != nullptr)
+            {
+                if (shell2[i]->getExplosed())
+                {
+                    if (explosionsCount < MAX_EXPLOSIONS)
+                    {
+                        explosionsCount++;
+                        expl[findFreeExpl()] = new Explosion(shell2[i]->getX(), shell2[i]->getY(), true);
+                    }
+                    delete shell2[i];
+                    shell2[i] = nullptr;
+                    tank[shell2TankNum[i]]->cannon1Count--;
+                }
+            }
+        }
+
+        for (byte i = 0; i < CANNON1_MAX; i++)
+        {
+            if (shell1[i] != nullptr)
+            {
+                shell1[i]->setPosLock(false);
+            }
+        }
+
+        for (byte i = 0; i < CANNON2_MAX; i++)
+        {
+            if (shell2[i] != nullptr)
+            {
+                shell2[i]->setPosLock(false);
+            }
         }
     }
 
-    for (byte i = 0; i < CANNON2_MAX; i++)
+    byte GameTank::findFreeExpl()
     {
-        if (shell2[i] != nullptr)
+        for (byte i = 0; i < MAX_EXPLOSIONS; i++)
         {
-            shell2[i]->setPosLock(false);
+            if (expl[i] == nullptr)
+            {
+                return i;
+            }
+        }
+        return 254;
+    }
+
+    void GameTank::gameStep()
+    {
+        tank[0]->shootTimer.tick();
+        drawScreen();
+        tankControl();
+        explosionsControl();
+        cannonControl();
+        for (byte i = 1; i < MAX_TANK_COUNT; i++)
+        {
+            if (ai[i] != nullptr)
+            {
+                ai[i]->steper();
+            }
+        }
+        if (btn_esc.btnState())
+        {
+
+            gamePause();
         }
     }
 }
-
-byte Game::findFreeExpl()
-{
-    for (byte i = 0; i < 10; i++)
-    {
-        if (expl[i] == nullptr)
-        {
-            return i;
-        }
-    }
-    return 254;
-}
-
-void Game::gameStep()
-{
-    drawScreen();
-    tankControl();
-
-    explosionsControl();
-    cannonControl();
-    for (byte i = 1; i < MAX_TANK_COUNT; i++)
-    {
-        if (ai[i] != nullptr)
-        {
-            ai[i]->steper();
-        }
-    }
-}
-
-void Game::btnsListener()
-{
-    btn_lt.buttonListener();
-    btn_rt.buttonListener();
-    btn_dn.buttonListener();
-    btn_up.buttonListener();
-    btn_st.buttonListener();
-}
-
-}
-
-/*
-                Serial.print("x1=");
-                Serial.println(tank1->getTankXPosition());
-                Serial.print("y1=");
-                Serial.println(tank1->getTankYPosition());
-                Serial.print("x2=");
-                Serial.println(tank1->getCannonStartX());
-                Serial.print("y2=");
-                Serial.println(tank1->getCannonStartY());
-*/

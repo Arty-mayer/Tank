@@ -1,27 +1,33 @@
+
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "Game.h"
+
 #define OLED_RESET -1
-// #define SCREEN_ADDRESS 0x3C
 #include <MemoryFree.h>
 
-// Adafruit_SSD1306 display(128,64,&Wire,OLED_RESET);
+#define OLED_MOSI 50
+#define OLED_CLK 52
+#define OLED_DC 10
+#define OLED_CS 53
+#define OLED_RESET 51
 
-#define OLED_MOSI 9
-#define OLED_CLK 10
-#define OLED_DC 11
-#define OLED_CS 12
-#define OLED_RESET 13
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-Button btn_lt = Button(2, true);
-Button btn_rt = Button(5, true);
-Button btn_dn = Button(3, true);
-Button btn_up = Button(4, true);
-Button btn_st = Button(6, true);
+Button btn_lt = Button(8, true);
+Button btn_rt = Button(7, true);
+Button btn_dn = Button(6, true);
+Button btn_up = Button(5, true);
+Button btn_st = Button(3, true);
+Button btn_md = Button(4, true);
+Button btn_esc = Button(2, true);
 
-Adafruit_SSD1306 display(128, 64, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
-
-using Tank::Game;
+Adafruit_SSD1306 display = Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
 Game *game;
+byte screen;
+
 void setup()
 {
 
@@ -29,7 +35,9 @@ void setup()
   Serial.println("start");
   displayInit();
   display.clearDisplay();
-  game = new Game();
+  display.setTextColor(1);
+  display.setTextSize(2);
+  screen = 0;
 }
 
 bool displayInit()
@@ -50,5 +58,44 @@ bool displayInit()
 
 void loop()
 {
-  game->mainLoop();
+  keyboardListener();
+  if (screen == 0)
+  {
+    if (btn_st.btnState())
+    {
+
+      screen = 2;
+      game = new Tank::GameTank;
+    }
+    return;
+  }
+  if (game->getExit())
+  {
+    Serial.print("fm1=");
+    Serial.println(freeMemory());
+    if (game != nullptr)
+    {
+      delete game;
+      game = nullptr;
+    }
+    Serial.print("fm2=");
+    Serial.println(freeMemory());
+    screen = 0;
+    delay(500);
+  }
+  if (game != nullptr)
+  {
+    game->mainLoop();
+  }
+}
+
+void keyboardListener()
+{
+  btn_lt.buttonListener();
+  btn_rt.buttonListener();
+  btn_dn.buttonListener();
+  btn_up.buttonListener();
+  btn_st.buttonListener();
+  btn_esc.buttonListener();
+  btn_md.buttonListener();
 }
