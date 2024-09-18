@@ -1,10 +1,9 @@
-
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "Game.h"
 
 #define OLED_RESET -1
-#include <MemoryFree.h>
+
 
 #define OLED_MOSI 50
 #define OLED_CLK 52
@@ -30,9 +29,6 @@ byte screen;
 
 void setup()
 {
-
-  Serial.begin(115200);
-  Serial.println("start");
   displayInit();
   display.clearDisplay();
   display.setTextColor(1);
@@ -71,15 +67,13 @@ void loop()
   }
   if (game->getExit())
   {
-    Serial.print("fm1=");
-    Serial.println(freeMemory());
+
     if (game != nullptr)
     {
       delete game;
       game = nullptr;
     }
-    Serial.print("fm2=");
-    Serial.println(freeMemory());
+
     screen = 0;
     delay(500);
   }

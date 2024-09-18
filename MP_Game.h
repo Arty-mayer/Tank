@@ -1,9 +1,6 @@
-
-#include <Arduino.h>
 #include "Lib_Button.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-#include <MemoryFree.h>
 
 extern Button btn_lt;
 extern Button btn_rt;

@@ -6,39 +6,31 @@
 
 namespace Tank
 {
-    
 
-
-
-class Ai{
-
+    class Ai
+    {
 
     public:
-    Ai (Tank *tnk);
+        Ai(Tank *tnk);
 
-    byte getMove(bool block);
-    byte getShoot();
-    void static setEmenyPos(int x, int y, int size);
-    void steper ();
+        byte getMove(bool block);
+        byte getShoot();
+        void static setEmenyPos(int x, int y, int size);
+        void steper();
 
-    bool step ();
+        bool step();
 
-    static int enemysX;
-    static int enemysY;
-    static int enemysSize;
-
-
-
-
+        static int enemysX;
+        static int enemysY;
+        static int enemysSize;
 
     private:
-    bool movementBlocked;
-    byte move;
-    byte shoot; 
-    Timer timerStep = Timer(200);
-    Tank *tank;  
-};
+        bool movementBlocked;
+        byte move;
+        byte shoot;
+        Timer timerStep = Timer(300);
+        Tank *tank;
+    };
 } // namespace Tank
-
 
 #endif
